@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+requests
+tqdm
+redis
+celery
+pydantic
+python-dotenv
+sentence-transformers
+pymupdf
+layoutparser
+pillow
+numpy
+qdrant-client
