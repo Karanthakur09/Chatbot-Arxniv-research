@@ -12,3 +12,4 @@ layoutparser
 pillow
 numpy
 qdrant-client
+boto3
