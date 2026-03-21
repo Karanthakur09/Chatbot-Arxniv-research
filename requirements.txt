@@ -13,3 +13,8 @@ pillow
 numpy
 qdrant-client
 boto3
+pymupdf
+pytesseract
+Pillow
+pdf2image
+pdfplumber
