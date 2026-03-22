@@ -18,3 +18,5 @@ pytesseract
 Pillow
 pdf2image
 pdfplumber
+google-genai
+tiktoken

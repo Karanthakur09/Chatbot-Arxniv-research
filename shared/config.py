@@ -33,5 +33,18 @@ class Settings:
 
     REQUEST_TIMEOUT: int = int(os.getenv("REQUEST_TIMEOUT", 30))
     ARXIV_RATE_LIMIT_SECONDS: int = int(os.getenv("ARXIV_RATE_LIMIT_SECONDS", 3))
-
+    
+    CONTEXT_MAX_TOKENS = int(os.getenv('CONTEXT_MAX_TOKENS', 6000))
+    # GOOGLE api key
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    GEMINI_MODEL = os.getenv('GEMINI_MODEL')
+    
+    LLM_TEMPERATURE = float(os.getenv('LLM_TEMPERATURE', 0.2))
+    LLM_MAX_TOKENS = int(os.getenv('LLM_MAX_TOKENS', 500))
+    
+    # openAI router
+    OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+    OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat")
+    
+    
 settings = Settings()
