@@ -1,13 +1,9 @@
 import json
-import redis
+from shared.redis_client import get_redis_client
 from shared.config import settings
 
-redis_client = redis.Redis(
-    host=settings.REDIS_HOST,
-    port=settings.REDIS_PORT,
-    decode_responses=True
-)
-
+# Get the shared instance
+redis_client = get_redis_client()
 
 def get_cache(key):
     value = redis_client.get(key)
