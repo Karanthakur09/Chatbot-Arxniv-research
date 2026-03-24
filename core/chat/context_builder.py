@@ -96,7 +96,6 @@ class ContextBuilder:
         total_tokens = 0
 
         for r in results:
-
             try:
                 doc_id = r.get("doc_id", "unknown")
 
@@ -110,28 +109,27 @@ class ContextBuilder:
                 if not content:
                     continue
 
-                # attach source id (for citations later)
                 content = f"[{doc_id}] {content}"
-
                 content_tokens = self._count_tokens(content)
 
-                # truncate if single chunk too big
-                if content_tokens > self.max_tokens:
-                    content = self._truncate_to_tokens(content, self.max_tokens)
-                    content_tokens = self._count_tokens(content)
+                remaining_tokens = self.max_tokens - total_tokens
 
-                if total_tokens + content_tokens > self.max_tokens:
+                if remaining_tokens <= 0:
                     break
+
+                if content_tokens > remaining_tokens:
+                    content = self._truncate_to_tokens(content, remaining_tokens)
+                    content_tokens = self._count_tokens(content)
 
                 context_parts.append(content)
                 total_tokens += content_tokens
-            
+
             except Exception as e:
                 logger.warning(f"Context build error: {e}")
                 continue
         
         logger.info(f"context_tokens={total_tokens}")
-            
+                    
         if not context_parts:
             logger.warning("Empty context generated")
 
