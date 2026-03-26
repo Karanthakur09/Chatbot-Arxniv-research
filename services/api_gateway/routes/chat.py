@@ -217,7 +217,7 @@
 
 #  imp code above don't delete it
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from pydantic import BaseModel
 import time
 
@@ -231,7 +231,7 @@ from infra.cache.memory_adapter import MemoryAdapter
 
 from core.chat.context_builder import ContextBuilder
 from core.chat.validator import QueryValidator
-
+from services.api_gateway.dependencies.auth import get_current_user
 from shared.logging import get_logger
 from shared.cache import get_cache, set_cache
 from shared.rate_limiter import RateLimiter
@@ -247,6 +247,7 @@ router = APIRouter()
 class ChatRequest(BaseModel):
     query: str
     session_id: str
+    conversation_id: str | None = None
     top_k: int = 5
     source: str | None = None
     chunk_type: str | None = None
@@ -281,7 +282,9 @@ rate_limiter = RateLimiter()
 # ---------------------------
 
 @router.post("/chat")
-def chat(req: ChatRequest, request: Request):
+def chat(req: ChatRequest, request: Request,user_id: str = Depends(get_current_user)):
+    # setting up to user_id
+    req.session_id = user_id
 
     start_time = time.time()
 
