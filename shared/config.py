@@ -47,5 +47,8 @@ class Settings:
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat")
     DATABASE_URL = os.getenv("DATABASE_URL")
     
+    # JWT configuration
+    JWT_SECRET = os.getenv("JWT_SECRET", "secret-key-123")
+    
     
 settings = Settings()

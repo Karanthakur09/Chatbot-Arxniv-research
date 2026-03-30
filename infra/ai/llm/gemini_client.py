@@ -1,3 +1,42 @@
+# from google import genai
+# import os
+
+# from shared.config import settings
+# from shared.logging import get_logger
+
+# logger = get_logger(__name__)
+
+
+# class GeminiClient:
+
+#     def __init__(self):
+#         api_key = settings.GEMINI_API_KEY or os.getenv("GOOGLE_API_KEY")
+
+#         if not api_key:
+#             raise ValueError("GEMINI_API_KEY not found")
+
+#         self.client = genai.Client(api_key=api_key)
+#         self.model = settings.GEMINI_MODEL
+
+#     def generate(self, prompt: str) -> str:
+
+#         try:
+#             response = self.client.models.generate_content(
+#                 model=self.model,
+#                 contents=prompt,
+#                 config={
+#                     "temperature": settings.LLM_TEMPERATURE,
+#                     "max_output_tokens": settings.LLM_MAX_TOKENS,
+#                 }
+#             )
+
+#             return response.text.strip() if response and response.text else ""
+
+#         except Exception as e:
+#             logger.error(f"Gemini error: {e}")
+#             return ""
+
+
 from google import genai
 import os
 
@@ -18,10 +57,10 @@ class GeminiClient:
         self.client = genai.Client(api_key=api_key)
         self.model = settings.GEMINI_MODEL
 
-    def generate(self, prompt: str) -> str:
+    def stream(self, prompt: str):
 
         try:
-            response = self.client.models.generate_content(
+            stream = self.client.models.generate_content_stream(
                 model=self.model,
                 contents=prompt,
                 config={
@@ -30,8 +69,10 @@ class GeminiClient:
                 }
             )
 
-            return response.text.strip() if response and response.text else ""
+            for chunk in stream:
+                if chunk.text:
+                    yield chunk.text
 
         except Exception as e:
-            logger.error(f"Gemini error: {e}")
-            return ""
+            logger.error(f"Gemini streaming error: {e}")
+            yield "[ERROR]"

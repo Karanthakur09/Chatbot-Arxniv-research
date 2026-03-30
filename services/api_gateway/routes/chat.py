@@ -1,222 +1,3 @@
-# from fastapi import APIRouter, Request
-# from pydantic import BaseModel
-# import time
-
-# from shared.logging import get_logger
-# from shared.cache import get_cache, set_cache
-
-# from services.api_gateway.services.embedder import embed_query_cached
-# from services.api_gateway.services.retriever import search_vectors, build_filters
-# from services.api_gateway.services.reranker import rerank
-# from services.api_gateway.services.context_builder import ContextBuilder
-# from services.api_gateway.services.llm_gateway import LLMGateway
-# from services.api_gateway.services.validators import QueryValidator
-# from shared.rate_limiter import RateLimiter
-# from services.api_gateway.services.memory import ConversationMemory
-
-# logger = get_logger(__name__)
-
-# router = APIRouter()
-
-# context_builder = ContextBuilder()
-# llm_gateway = LLMGateway()
-# validator = QueryValidator()
-# rate_limiter = RateLimiter()
-# memory = ConversationMemory()
-
-
-# # --- Helper Functions ---
-
-# def diversify_results(results, max_per_doc=2):
-#     doc_count = {}
-#     diversified = []
-
-#     for r in results:
-#         doc_id = r.get("doc_id")
-
-#         if doc_count.get(doc_id, 0) >= max_per_doc:
-#             continue
-
-#         doc_count[doc_id] = doc_count.get(doc_id, 0) + 1
-#         diversified.append(r)
-
-#     return diversified
-
-
-# def deduplicate_results(results):
-#     seen = set()
-#     unique = []
-
-#     for r in results:
-#         content = r.get("content", "")
-#         key = content[:200].strip()
-
-#         if key in seen or not key:
-#             continue
-
-#         seen.add(key)
-#         unique.append(r)
-
-#     return unique
-
-
-# # --- Models ---
-
-# class ChatRequest(BaseModel):
-#     query: str
-#     session_id: str
-#     top_k: int = 5
-#     source: str | None = None
-#     chunk_type: str | None = None
-
-
-# # --- Main Route ---
-
-# @router.post("/chat")
-# def chat(req: ChatRequest, request: Request):
-
-#     start_time = time.time()
-
-#     # 1. Rate Limiting
-#     client_ip = request.client.host
-#     if not rate_limiter.allow(f"rate:{client_ip}"):
-#         return {
-#             "query": req.query,
-#             "answer": "Too many requests. Please try again in a minute.",
-#             "sources": []
-#         }
-
-#     # 2. Validation
-#     is_valid, validated_query_or_error = validator.validate(req.query)
-#     if not is_valid:
-#         return {
-#             "query": req.query,
-#             "answer": validated_query_or_error,
-#             "sources": []
-#         }
-
-#     query = validated_query_or_error
-
-#     try:
-#         # 3. Fetch Memory FIRST (important)
-#         history = memory.get_history(req.session_id)
-
-#         # 🔥 Limit history (avoid token explosion)
-#         history = history[-3:] if history else []
-
-#         # 🔥 Disable cache if conversation exists
-#         use_cache = not history
-
-#         if use_cache:
-#             cache_key = f"chat:{query}:{req.source}:{req.chunk_type}"
-#             cached = get_cache(cache_key)
-
-#             if cached:
-#                 logger.info("cache_hit=true")
-#                 return cached
-
-#         logger.info("cache_hit=false")
-
-#         # 4. Retrieval
-#         retrieval_start = time.time()
-
-#         query_vector = embed_query_cached(query)
-
-#         filters = build_filters(
-#             source=req.source,
-#             chunk_type=req.chunk_type
-#         )
-
-#         results = search_vectors(
-#             query_vector,
-#             query_text=query,
-#             top_k=20,
-#             filters=filters
-#         )
-
-#         if not results:
-#             return {
-#                 "query": query,
-#                 "answer": "No relevant docs found.",
-#                 "sources": []
-#             }
-
-#         retrieval_time = round(time.time() - retrieval_start, 3)
-#         logger.info(f"retrieval_time={retrieval_time}s results={len(results)}")
-
-#         # 5. Rerank
-#         rerank_start = time.time()
-        
-#         if len(results) > 5:
-#             logger.info(f"Reranking {len(results)} results...")
-#             results = rerank(query, results, top_k=req.top_k)
-#         else:
-#             logger.info("Skipping rerank (too few results)")
-#             results = results[:req.top_k]
-
-#         rerank_time = round(time.time() - rerank_start, 3)
-#         logger.info(f"rerank_time={rerank_time}s")
-
-#         # 6. Clean Results
-#         results = deduplicate_results(results)
-#         results = diversify_results(results, max_per_doc=2)
-
-#         results = results[:req.top_k]
-
-#         # 7. Context
-#         context = context_builder.build(results)
-
-#         if not context or len(context.strip()) < 20:
-#             return {
-#                 "query": query,
-#                 "answer": "Not found in context",
-#                 "sources": results
-#             }
-
-#         # 8. LLM
-#         llm_start = time.time()
-
-#         answer = llm_gateway.generate_answer(
-#             query=query,
-#             context=context,
-#             history=history
-#         )
-
-#         llm_time = round(time.time() - llm_start, 3)
-
-#         total_time = round(time.time() - start_time, 3)
-
-#         logger.info(
-#             f"query='{query}' total_time={total_time}s llm_time={llm_time}s"
-#         )
-
-#         response = {
-#             "query": query,
-#             "answer": answer,
-#             "sources": results,
-#             "latency": total_time
-#         }
-
-#         # 9. Save Memory (ONLY meaningful answers)
-#         if answer and answer != "Not found in context" and "[" in answer:
-#             memory.save(req.session_id, query, answer)
-
-#         # 10. Cache ONLY if stateless
-#         if use_cache:
-#             set_cache(cache_key, response, ttl=60)
-
-#         return response
-
-#     except Exception as e:
-#         logger.error(f"chat_pipeline_failed query='{query}' error={e}")
-#         return {
-#             "query": query,
-#             "answer": "Internal server error.",
-#             "sources": []
-#         }
-
-#  imp code above don't delete it
-
 from fastapi import APIRouter, Request, Depends
 from pydantic import BaseModel
 import time
@@ -235,10 +16,16 @@ from services.api_gateway.dependencies.auth import get_current_user
 from shared.logging import get_logger
 from shared.cache import get_cache, set_cache
 from shared.rate_limiter import RateLimiter
+from fastapi.responses import StreamingResponse
+import json
+import hashlib
+from fastapi.responses import JSONResponse
+from infra.db.session import SessionLocal
+from fastapi import BackgroundTasks # 1. Import BackgroundTasks
+from infra.db.repositories.conversation_repository import ConversationRepository
 
 logger = get_logger(__name__)
 router = APIRouter()
-
 
 # ---------------------------
 # Models
@@ -252,7 +39,39 @@ class ChatRequest(BaseModel):
     source: str | None = None
     chunk_type: str | None = None
 
+# ---------------------------
+# Helper Functions
+# ---------------------------
 
+def get_llm_cache_key(req: ChatRequest) -> str:
+    """Generates a consistent, hashed cache key for both sync and stream."""
+    clean_query = req.query.strip().lower()
+    source = req.source or "all"
+    chunk_type = req.chunk_type or "standard"
+    
+    # We include session_id only if answers are history-dependent
+    # Otherwise, remove req.session_id for a global cache
+    raw_key = f"{req.session_id}:{clean_query}:{source}:{chunk_type}"
+    key_hash = hashlib.md5(raw_key.encode()).hexdigest()
+    
+    return f"llm_cache:{key_hash}"
+
+# 4. The Background Worker Function
+def finalize_chat_session(req: ChatRequest, full_answer: str, cache_key: str):
+    """Runs after the stream is finished to persist data safely."""
+    try:
+        # Save to Redis Cache
+        set_cache(cache_key, {"query": req.query, "answer": full_answer}, ttl=60)
+        
+        # Save to Postgres Memory/History
+        # This ensures history is updated even if the user disconnected mid-stream
+        chat_service.memory.save(req.session_id, req.query, full_answer)
+        
+        logger.info(f"background_save_complete session={req.session_id}")
+    except Exception as e:
+        logger.error(f"background_save_failed: {e}")
+
+    
 # ---------------------------
 # Dependencies
 # ---------------------------
@@ -282,61 +101,161 @@ rate_limiter = RateLimiter()
 # ---------------------------
 
 @router.post("/chat")
-def chat(req: ChatRequest, request: Request,user_id: str = Depends(get_current_user)):
-    # setting up to user_id
-    req.session_id = user_id
-
+def chat(
+    req: ChatRequest, 
+    request: Request, 
+    background_tasks: BackgroundTasks, 
+    user_id: str = Depends(get_current_user)
+):
     start_time = time.time()
-
-    # 1. Rate limiting
     client_ip = request.client.host
+
+    # 1. PRE-CHECK: Rate limiting
+    if not rate_limiter.allow(f"rate:{client_ip}"):
+        return JSONResponse(
+            status_code=429,
+            content={"query": req.query, "answer": "Too many requests.", "sources": []}
+        )
+
+    # 2. PRE-CHECK: Validation
+    is_valid, validated_query = validator.validate(req.query)
+    if not is_valid:
+        return {"query": req.query, "answer": validated_query, "sources": []}
+    
+    req.query = validated_query
+
+    # 3. Conversation Handling (DB logic)
+    db = SessionLocal()
+    try:
+        conv_repo = ConversationRepository(db)
+        if not req.conversation_id:
+            conv = conv_repo.create_conversation(user_id)
+            conversation_id = str(conv.id)
+        else:
+            conversation_id = req.conversation_id
+    finally:
+        db.close() # Close immediately after getting the ID
+
+    req.session_id = conversation_id
+
+    try:
+        # 4. PRE-CHECK: Cache
+        cache_key = get_llm_cache_key(req)
+        cached = get_cache(cache_key)
+        if cached:
+            logger.info(f"cache_hit=true key={cache_key}")
+            return JSONResponse(
+                content=cached,
+                headers={"X-Conversation-Id": conversation_id}
+            )
+
+        # 5. Core Chat Logic
+        response = chat_service.handle_chat(req)
+        
+        # Add metadata to response
+        response["conversation_id"] = conversation_id
+        response["latency"] = round(time.time() - start_time, 3)
+
+        # 6. Post-Processing: Background Task
+        # We save history and cache in the background to return the response faster
+        answer = response.get("answer")
+        if answer and "Not found in context" not in answer:
+            background_tasks.add_task(
+                finalize_chat_session,
+                req=req,
+                full_answer=answer,
+                cache_key=cache_key
+            )
+
+        # 7. Return with Header
+        return JSONResponse(
+            content=response,
+            headers={"X-Conversation-Id": conversation_id}
+        )
+
+    except Exception as e:
+        logger.error(f"chat_route_failed: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"query": req.query, "answer": "Internal server error.", "sources": []}
+        )
+      
+        
+@router.post("/chat/stream")
+def stream_chat(req: ChatRequest, request: Request, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
+    client_ip = request.client.host
+
+    # PRE-CHECK 1: Rate Limiting (Returns JSON, no SSE opened)
     if not rate_limiter.allow(f"rate:{client_ip}"):
         return {
             "query": req.query,
-            "answer": "Too many requests. Please try again in a minute.",
+            "answer": "Too many requests. Please try again later.",
             "sources": []
         }
 
-    # 2. Validation
-    is_valid, validated_query_or_error = validator.validate(req.query)
+    # PRE-CHECK 2: Validation (Returns JSON, no SSE opened)
+    is_valid, validated_query = validator.validate(req.query)
     if not is_valid:
         return {
-            "query": req.query,
-            "answer": validated_query_or_error,
+            "query": req.query, 
+            "answer": validated_query, 
             "sources": []
         }
 
-    query = validated_query_or_error
-
+    req.query = validated_query
+    
+    # Conversation Handling (DB logic)
+    # We use 'with' or try/finally to ensure db.close() always runs
+    db = SessionLocal()
     try:
-        # 3. Cache (only for stateless queries)
-        cache_key = f"chat:{query}:{req.source}:{req.chunk_type}"
-        cached = get_cache(cache_key)
+        conv_repo = ConversationRepository(db)
+        if not req.conversation_id:
+            conv = conv_repo.create_conversation(user_id)
+            conversation_id = str(conv.id)
+        else:
+            conversation_id = req.conversation_id
+    finally:
+        db.close()
+        
+    # Crucial: Use conversation_id as the session_id for memory retrieval
+    req.session_id = conversation_id
+        
+    # PRE-CHECK 3: Cache (Returns JSON, no SSE opened)
+    cache_key = get_llm_cache_key(req)
+    cached = get_cache(cache_key)
+    if cached:
+        logger.info(f"cache_hit=true key={cache_key}")
+         # FIX: Wrap the dict in JSONResponse to attach the header
+        return JSONResponse(
+            content=cached,
+            headers={"X-Conversation-Id": conversation_id}
+        )
 
-        if cached:
-            logger.info("cache_hit=true")
-            return cached
+    def event_generator():
+        full_answer = ""
+        try:
+            # Core Logic Execution via Service
+            for chunk in chat_service.stream_chat(req):
+                if chunk:
+                    full_answer += chunk
+                    yield f"data: {chunk}\n\n"
+            
+            # Save Cache after stream completion
+            if full_answer and "Not found in context" not in full_answer:
+                background_tasks.add_task(
+                    finalize_chat_session,
+                    req=req,
+                    full_answer=full_answer,
+                    cache_key=cache_key
+                )
+                
+        except Exception as e:
+            logger.error(f"stream_failed: {e}")
+            yield f"data: {json.dumps({'error': 'Stream interrupted'})}\n\n"
 
-        logger.info("cache_hit=false")
 
-        # 4. Core Chat Logic
-        response = chat_service.handle_chat(req)
-
-        total_time = round(time.time() - start_time, 3)
-        response["latency"] = total_time
-
-        logger.info(f"query='{query}' total_time={total_time}s")
-
-        # 5. Cache response
-        if response.get("answer") and response["answer"] != "Not found in context":
-            set_cache(cache_key, response, ttl=60)
-
-        return response
-
-    except Exception as e:
-        logger.error(f"chat_route_failed query='{query}' error={e}")
-        return {
-            "query": query,
-            "answer": "Internal server error.",
-            "sources": []
-        }
+    # 5. Build Response and add Custom Header
+    response = StreamingResponse(event_generator(), media_type="text/event-stream")
+    response.headers["X-Conversation-Id"] = conversation_id
+    
+    return response

@@ -94,3 +94,23 @@ class GatewayLLM(BaseLLM):
 
     Detailed Answer:
     """
+    
+    def stream_answer(self, query: str, context: str, history):
+
+        prompt = self._build_prompt(query, context, history)
+
+        # Primary (Gemini)
+        try:
+            for chunk in self.primary.stream(prompt):
+                yield chunk
+            return
+        except Exception as e:
+            logger.warning(f"Gemini stream failed: {e}")
+
+        # Fallback (OpenRouter)
+        try:
+            for chunk in self.fallback.stream(prompt):
+                yield chunk
+        except Exception as e:
+            logger.error(f"Fallback stream failed: {e}")
+            yield "[ERROR]"    

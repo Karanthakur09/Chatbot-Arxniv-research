@@ -173,3 +173,79 @@ class ChatService:
                 "answer": "Internal server error.",
                 "sources": []
             }
+    
+    def stream_chat(self, req: Any):
+        start_time = time.time()
+        full_answer = ""
+        results = []
+
+        try:
+            # 1. Memory
+            history = self.memory.get_history(req.session_id)
+            history = history[-3:] if history else []
+            logger.info(f"stream_history_length={len(history)}")
+
+            # 2. Embedding
+            embed_start = time.time()
+            query_vector = self.embedder.embed(req.query)
+            logger.info(f"stream_embed_time={round(time.time() - embed_start, 3)}s")
+
+            # 3. Retrieval
+            retrieval_start = time.time()
+            results = self.retriever.search(
+                query_vector=query_vector,
+                query_text=req.query,
+                top_k=20,
+                source=req.source,
+                chunk_type=req.chunk_type
+            )
+
+            if not results:
+                yield "No relevant docs found."
+                return
+
+            logger.info(f"stream_retrieval_time={round(time.time() - retrieval_start, 3)}s results={len(results)}")
+
+            # 4. Rerank
+            rerank_start = time.time()
+            if len(results) > 5:
+                results = self.reranker.rerank(req.query, results, req.top_k)
+                logger.info(f"stream_rerank_time={round(time.time() - rerank_start, 3)}s")
+            else:
+                results = results[:req.top_k]
+
+            # 5. Clean Results
+            results = self._deduplicate_results(results)
+            results = self._diversify_results(results, max_per_doc=2)
+            results = results[:req.top_k]
+
+            # 6. Context Build
+            context = self.context_builder.build(results)
+            if not context or len(context.strip()) < 20:
+                yield "Not found in context"
+                return
+
+            # 7. LLM Streaming
+            llm_start = time.time()
+            
+            # We wrap the generator to capture the full string for memory
+            for chunk in self.llm.stream_answer(
+                query=req.query,
+                context=context,
+                history=history
+            ):
+                if chunk:
+                    full_answer += chunk
+                    yield chunk
+
+            llm_time = round(time.time() - llm_start, 3)
+            total_time = round(time.time() - start_time, 3)
+            logger.info(f"stream_complete query='{req.query}' total={total_time}s llm={llm_time}s")
+
+            # 8. Save Memory (Matches your logic: non-empty, found, and has citations/format)
+            if full_answer and "Not found in context" not in full_answer and "[" in full_answer:
+                self.memory.save(req.session_id, req.query, full_answer)
+
+        except Exception as e:
+            logger.error(f"stream_chat_failed query='{req.query}' error={e}")
+            yield "Internal server error."

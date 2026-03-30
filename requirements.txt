@@ -25,3 +25,5 @@ alembic
 psycopg2-binary
 python-jose 
 passlib[bcrypt]
+bcrypt
+langfuse

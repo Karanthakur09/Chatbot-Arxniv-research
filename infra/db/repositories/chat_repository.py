@@ -62,3 +62,11 @@ class ChatRepository:
             }
             for m in reversed(messages)
         ]
+        
+    def get_messages(self, conversation_id: str):
+        return (
+            self.db.query(Message)
+            .filter(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.asc())
+            .all()
+        )
