@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Depends
 from pydantic import BaseModel
 import time
-
+from sqlalchemy.ext.asyncio import AsyncSession
 from core.chat.chat_service import ChatService
 
 from infra.ai.embeddings.local_embedder import LocalEmbedder
@@ -15,12 +15,13 @@ from core.chat.validator import QueryValidator
 from services.api_gateway.dependencies.auth import get_current_user
 from shared.logging import get_logger
 from shared.cache import get_cache, set_cache
-from shared.rate_limiter import RateLimiter
+from services.api_gateway.middleware.rate_limiter import limiter
 from fastapi.responses import StreamingResponse
 import json
 import hashlib
 from fastapi.responses import JSONResponse
-from infra.db.session import SessionLocal
+from infra.db.session import AsyncSessionLocal # 2. Use AsyncSessionLocal
+from services.api_gateway.dependencies.db import get_db
 from fastapi import BackgroundTasks # 1. Import BackgroundTasks
 from infra.db.repositories.conversation_repository import ConversationRepository
 
@@ -57,16 +58,11 @@ def get_llm_cache_key(req: ChatRequest) -> str:
     return f"llm_cache:{key_hash}"
 
 # 4. The Background Worker Function
-def finalize_chat_session(req: ChatRequest, full_answer: str, cache_key: str):
-    """Runs after the stream is finished to persist data safely."""
+async def finalize_chat_session(req: ChatRequest, full_answer: str, cache_key: str):
+    """Async background task to save cache and memory"""
     try:
-        # Save to Redis Cache
-        set_cache(cache_key, {"query": req.query, "answer": full_answer}, ttl=60)
-        
-        # Save to Postgres Memory/History
-        # This ensures history is updated even if the user disconnected mid-stream
-        chat_service.memory.save(req.session_id, req.query, full_answer)
-        
+        await set_cache(cache_key, {"query": req.query, "answer": full_answer}, ttl=60)
+        await chat_service.memory.save(req.session_id, req.query, full_answer)
         logger.info(f"background_save_complete session={req.session_id}")
     except Exception as e:
         logger.error(f"background_save_failed: {e}")
@@ -93,7 +89,6 @@ chat_service = ChatService(
 )
 
 validator = QueryValidator()
-rate_limiter = RateLimiter()
 
 
 # ---------------------------
@@ -101,21 +96,16 @@ rate_limiter = RateLimiter()
 # ---------------------------
 
 @router.post("/chat")
-def chat(
+# SlowAPI automatically uses the 'request' object to track the user
+@limiter.limit("20/minute") 
+async def chat( # Add async
     req: ChatRequest, 
     request: Request, 
     background_tasks: BackgroundTasks, 
-    user_id: str = Depends(get_current_user)
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db) # 5. Use the async DB dependency
 ):
     start_time = time.time()
-    client_ip = request.client.host
-
-    # 1. PRE-CHECK: Rate limiting
-    if not rate_limiter.allow(f"rate:{client_ip}"):
-        return JSONResponse(
-            status_code=429,
-            content={"query": req.query, "answer": "Too many requests.", "sources": []}
-        )
 
     # 2. PRE-CHECK: Validation
     is_valid, validated_query = validator.validate(req.query)
@@ -125,23 +115,23 @@ def chat(
     req.query = validated_query
 
     # 3. Conversation Handling (DB logic)
-    db = SessionLocal()
     try:
         conv_repo = ConversationRepository(db)
         if not req.conversation_id:
-            conv = conv_repo.create_conversation(user_id)
+            conv = await conv_repo.create_conversation(user_id)
             conversation_id = str(conv.id)
         else:
             conversation_id = req.conversation_id
-    finally:
-        db.close() # Close immediately after getting the ID
+    except Exception as e:
+        logger.error(f"db_error: {e}")
+        conversation_id = req.conversation_id or "temp_session"
 
     req.session_id = conversation_id
 
     try:
         # 4. PRE-CHECK: Cache
         cache_key = get_llm_cache_key(req)
-        cached = get_cache(cache_key)
+        cached = await get_cache(cache_key)
         if cached:
             logger.info(f"cache_hit=true key={cache_key}")
             return JSONResponse(
@@ -150,7 +140,7 @@ def chat(
             )
 
         # 5. Core Chat Logic
-        response = chat_service.handle_chat(req)
+        response = await chat_service.handle_chat(req) # Must await!
         
         # Add metadata to response
         response["conversation_id"] = conversation_id
@@ -166,7 +156,7 @@ def chat(
                 full_answer=answer,
                 cache_key=cache_key
             )
-
+            
         # 7. Return with Header
         return JSONResponse(
             content=response,
@@ -182,16 +172,15 @@ def chat(
       
         
 @router.post("/chat/stream")
-def stream_chat(req: ChatRequest, request: Request, background_tasks: BackgroundTasks, user_id: str = Depends(get_current_user)):
-    client_ip = request.client.host
+@limiter.limit("20/minute") 
+async def stream_chat( # Add async
+    req: ChatRequest, 
+    request: Request, 
+    background_tasks: BackgroundTasks, 
+    user_id: str = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db) # 10. Inject db
+):   
 
-    # PRE-CHECK 1: Rate Limiting (Returns JSON, no SSE opened)
-    if not rate_limiter.allow(f"rate:{client_ip}"):
-        return {
-            "query": req.query,
-            "answer": "Too many requests. Please try again later.",
-            "sources": []
-        }
 
     # PRE-CHECK 2: Validation (Returns JSON, no SSE opened)
     is_valid, validated_query = validator.validate(req.query)
@@ -205,54 +194,45 @@ def stream_chat(req: ChatRequest, request: Request, background_tasks: Background
     req.query = validated_query
     
     # Conversation Handling (DB logic)
-    # We use 'with' or try/finally to ensure db.close() always runs
-    db = SessionLocal()
     try:
         conv_repo = ConversationRepository(db)
         if not req.conversation_id:
-            conv = conv_repo.create_conversation(user_id)
+            conv = await conv_repo.create_conversation(user_id)
             conversation_id = str(conv.id)
         else:
             conversation_id = req.conversation_id
-    finally:
-        db.close()
+    except Exception as e:
+        logger.error(f"db_error: {e}")
+        conversation_id = req.conversation_id or "temp_session"
         
     # Crucial: Use conversation_id as the session_id for memory retrieval
     req.session_id = conversation_id
         
     # PRE-CHECK 3: Cache (Returns JSON, no SSE opened)
     cache_key = get_llm_cache_key(req)
-    cached = get_cache(cache_key)
+    cached = await get_cache(cache_key)
     if cached:
         logger.info(f"cache_hit=true key={cache_key}")
-         # FIX: Wrap the dict in JSONResponse to attach the header
         return JSONResponse(
             content=cached,
             headers={"X-Conversation-Id": conversation_id}
         )
 
-    def event_generator():
+    async def event_generator(): # Must be 'async def'
         full_answer = ""
         try:
-            # Core Logic Execution via Service
-            for chunk in chat_service.stream_chat(req):
+            # chat_service.stream_chat MUST now be an async generator
+            async for chunk in chat_service.stream_chat(req): 
                 if chunk:
                     full_answer += chunk
                     yield f"data: {chunk}\n\n"
             
-            # Save Cache after stream completion
             if full_answer and "Not found in context" not in full_answer:
-                background_tasks.add_task(
-                    finalize_chat_session,
-                    req=req,
-                    full_answer=full_answer,
-                    cache_key=cache_key
-                )
+                background_tasks.add_task(finalize_chat_session, req, full_answer, cache_key)
                 
         except Exception as e:
-            logger.error(f"stream_failed: {e}")
-            yield f"data: {json.dumps({'error': 'Stream interrupted'})}\n\n"
-
+            logger.error(f"stream_error: {e}")
+            yield "data: [ERROR]\n\n"
 
     # 5. Build Response and add Custom Header
     response = StreamingResponse(event_generator(), media_type="text/event-stream")

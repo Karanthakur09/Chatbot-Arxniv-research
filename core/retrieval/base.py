@@ -4,11 +4,11 @@ from typing import List, Dict, Optional
 
 class BaseRetriever(ABC):
     """
-    Interface for retrieval systems (vector + hybrid)
+    Interface for retrieval systems (vector + hybrid) - Async
     """
 
     @abstractmethod
-    def search(
+    async def search(
         self,
         query_vector: List[float],
         query_text: str,
@@ -17,6 +17,6 @@ class BaseRetriever(ABC):
         chunk_type: Optional[str] = None
     ) -> List[Dict]:
         """
-        Retrieve relevant documents
+        Retrieve relevant documents (async)
         """
         pass

@@ -1,13 +1,17 @@
-import redis
+import redis.asyncio as redis
 from shared.config import settings
 
-# This creates a single instance that other files will share
-redis_client = redis.Redis(
-    host=settings.REDIS_HOST,
-    port=settings.REDIS_PORT,
-    decode_responses=True
-)
+# Async Redis connection pool
+_redis_pool = None
 
-def get_redis_client():
-    """Helper function to return the shared client"""
-    return redis_client
+async def get_redis_client():
+    """Get or create async Redis client"""
+    global _redis_pool
+    if _redis_pool is None:
+        _redis_pool = redis.ConnectionPool(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            decode_responses=True,
+            max_connections=10
+        )
+    return redis.Redis(connection_pool=_redis_pool)

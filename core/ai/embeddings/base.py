@@ -4,12 +4,12 @@ from typing import List
 
 class BaseEmbedder(ABC):
     """
-    Interface for embedding providers
+    Interface for embedding providers (Async)
     """
 
     @abstractmethod
-    def embed(self, text: str) -> List[float]:
+    async def embed(self, text: str) -> List[float]:
         """
-        Convert text into vector embedding
+        Convert text into vector embedding (async)
         """
         pass

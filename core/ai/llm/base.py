@@ -4,17 +4,17 @@ from typing import List, Dict
 
 class BaseLLM(ABC):
     """
-    Interface for LLM providers
+    Interface for LLM providers (Async)
     """
 
     @abstractmethod
-    def generate_answer(
+    async def generate_answer(
         self,
         query: str,
         context: str,
         history: List[Dict]
     ) -> str:
         """
-        Generate answer using context + history
+        Generate answer using context + history (async)
         """
         pass

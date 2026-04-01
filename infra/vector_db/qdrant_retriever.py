@@ -1,4 +1,5 @@
 from typing import List, Dict, Optional
+import asyncio
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue
@@ -12,7 +13,7 @@ logger = get_logger(__name__)
 
 class QdrantRetriever:
     """
-    Production Qdrant retriever (fully decoupled)
+    Production Qdrant retriever (async) - fully decoupled
     """
 
     def __init__(self):
@@ -44,7 +45,7 @@ class QdrantRetriever:
 
         return Filter(must=conditions) if conditions else None
 
-    def search(
+    async def search(
         self,
         query_vector: List[float],
         query_text: str,
@@ -52,15 +53,18 @@ class QdrantRetriever:
         source: Optional[str] = None,
         chunk_type: Optional[str] = None
     ) -> List[Dict]:
-
+        """Async search in Qdrant using thread pool"""
         try:
             filters = self._build_filters(source, chunk_type)
 
-            search_result = self.client.query_points(
-                collection_name=self.collection_name,
-                query=query_vector,
-                limit=top_k,
-                query_filter=filters
+            # Run blocking search in thread pool
+            search_result = await asyncio.to_thread(
+                lambda: self.client.query_points(
+                    collection_name=self.collection_name,
+                    query=query_vector,
+                    limit=top_k,
+                    query_filter=filters
+                )
             )
 
             results = []

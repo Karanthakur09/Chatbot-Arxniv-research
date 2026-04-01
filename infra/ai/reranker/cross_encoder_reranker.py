@@ -1,4 +1,5 @@
 from typing import List, Dict
+import asyncio
 
 from sentence_transformers import CrossEncoder
 
@@ -9,22 +10,26 @@ logger = get_logger(__name__)
 
 class CrossEncoderReranker:
     """
-    Production reranker (no global model)
+    Production reranker (async) - no global model
     """
 
     def __init__(self):
         self.model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 
-    def rerank(
+    async def rerank(
         self,
         query: str,
         results: List[Dict],
         top_k: int
     ) -> List[Dict]:
-
+        """Async rerank using thread pool for CPU-bound operation"""
         try:
             pairs = [(query, r["content"]) for r in results]
-            scores = self.model.predict(pairs)
+            
+            # Run CPU-intensive prediction in thread pool
+            scores = await asyncio.to_thread(
+                lambda: self.model.predict(pairs)
+            )
 
             for r, score in zip(results, scores):
                 r["rerank_score"] = float(score)

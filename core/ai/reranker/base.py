@@ -4,17 +4,17 @@ from typing import List, Dict
 
 class BaseReranker(ABC):
     """
-    Interface for reranking models
+    Interface for reranking models (Async)
     """
 
     @abstractmethod
-    def rerank(
+    async def rerank(
         self,
         query: str,
         results: List[Dict],
         top_k: int
     ) -> List[Dict]:
         """
-        Rerank retrieved results
+        Rerank retrieved results (async)
         """
         pass

@@ -6,6 +6,7 @@ from shared.logging import get_logger
 
 from infra.ai.llm.gemini_client import GeminiClient
 from infra.ai.llm.openrouter_client import OpenRouterClient
+from infra.observability.langfuse_client import langfuse
 
 logger = get_logger(__name__)
 
@@ -16,38 +17,62 @@ class GatewayLLM(BaseLLM):
         self.primary = GeminiClient()
         self.fallback = OpenRouterClient()
 
-    def generate_answer(
-        self,
-        query: str,
-        context: str,
-        history: List[Dict]
-    ) -> str:
+    
+    async def generate_answer(self, query: str, context: str, history: List[Dict]) -> str:
+    
+        with langfuse.start_as_current_observation(
+            name="chat_gen_static",
+            input={"query": query}
+        ) as trace:
 
-        prompt = self._build_prompt(query, context, history)
+            prompt = self._build_prompt(query, context, history)
 
-        # Primary
-        for attempt in range(2):
+            # Primary Attempt
             try:
-                start = time.time()
-                answer = self.primary.generate(prompt)
+                with langfuse.start_as_current_observation(
+                    name="gemini_call",
+                    as_type="generation",
+                    model="gemini-pro",
+                    input=prompt
+                ) as gen:
 
-                if self._valid(answer):
-                    logger.info(f"llm=gemini latency={round(time.time()-start,2)}s")
-                    return answer
+                    answer = await self.primary.generate(prompt)
+
+                    if self._valid(answer):
+                        gen.update(output=answer)
+                        trace.update(output=answer)
+                        langfuse.flush()
+                        return answer
+
+                    gen.update(output=answer, metadata={"validation": "failed"})
 
             except Exception as e:
                 logger.warning(f"Gemini failed: {e}")
+                trace.update(metadata={"primary_error": str(e)})
 
-        # Fallback
-        try:
-            answer = self.fallback.generate(prompt)
-            if self._valid(answer):
-                return answer
-        except Exception as e:
-            logger.error(f"Fallback failed: {e}")
+            # Fallback Attempt
+            try:
+                with langfuse.start_as_current_observation(
+                    name="fallback_call",
+                    as_type="generation",
+                    model="openrouter",
+                    input=prompt
+                ) as fb_gen:
 
-        return "Not found in context"
+                    answer = await self.fallback.generate(prompt)
+                    final = answer if answer else "Not found in context"
 
+                    fb_gen.update(output=final)
+                    trace.update(output=final)
+
+                    langfuse.flush()
+                    return final
+
+            except Exception as e:
+                logger.error(f"Total failure: {e}")
+                trace.update(status_message="failed", metadata={"error": str(e)})
+                return "Not found in context"
+            
     def _valid(self, answer: str) -> bool:
         if not answer:
             return False
@@ -94,23 +119,87 @@ class GatewayLLM(BaseLLM):
 
     Detailed Answer:
     """
+    #         if primary_span:
+    #             primary_span.update(metadata={"error_type": "primary_failure", "error_msg": str(e)})
+    #             primary_span.end(status_message="failed")
+
+    #     # Fallback (OpenRouter)
+    #     try:
+    #         fallback_span = trace.span(name="llm_fallback_call")
+    #         fallback_output = ""
+    #         for chunk in self.fallback.stream(prompt):
+    #             fallback_output += chunk
+    #             full_output += chunk
+    #             yield chunk
+            
+    #         if fallback_output:
+    #             fallback_span.end(output=fallback_output, status_message="fallback_success")
+    #         else:
+    #             fallback_span.end(output="[No output]", status_message="fallback_no_output")
+                
+    #     except Exception as e:
+    #         logger.error(f"Fallback stream failed: {e}")
+            
+    #         if primary_span:
+    #             trace.update(status_message="Total Failure", metadata={"error": str(e)})
+    #         yield "[ERROR: AI service unavailable]"
     
     def stream_answer(self, query: str, context: str, history):
 
-        prompt = self._build_prompt(query, context, history)
+        with langfuse.start_as_current_observation(
+            name="chat_request",
+            input={"query": query, "history_count": len(history)}
+        ) as trace:
 
-        # Primary (Gemini)
-        try:
-            for chunk in self.primary.stream(prompt):
-                yield chunk
-            return
-        except Exception as e:
-            logger.warning(f"Gemini stream failed: {e}")
+            prompt = self._build_prompt(query, context, history)
 
-        # Fallback (OpenRouter)
-        try:
-            for chunk in self.fallback.stream(prompt):
-                yield chunk
-        except Exception as e:
-            logger.error(f"Fallback stream failed: {e}")
-            yield "[ERROR]"    
+            full_output = ""
+
+            # Primary (Gemini)
+            try:
+                with langfuse.start_as_current_observation(
+                    name="llm_streaming_call",
+                    as_type="generation",
+                    model="gemini-pro",
+                    input=prompt
+                ) as primary_span:
+
+                    for chunk in self.primary.stream(prompt):
+                        full_output += chunk
+                        yield chunk
+
+                    if full_output:
+                        primary_span.update(output=full_output)
+                        trace.update(output=full_output)   # ✅ IMPORTANT
+
+            except Exception as e:
+                logger.warning(f"Gemini stream failed: {e}")
+                trace.update(metadata={"primary_error": str(e)})
+
+            # Fallback
+            try:
+                with langfuse.start_as_current_observation(
+                    name="llm_fallback_call",
+                    as_type="generation",
+                    model="openrouter",
+                    input=prompt
+                ) as fallback_span:
+
+                    fallback_output = ""
+
+                    for chunk in self.fallback.stream(prompt):
+                        fallback_output += chunk
+                        full_output += chunk
+                        yield chunk
+
+                    final = fallback_output if fallback_output else "[No output]"
+
+                    fallback_span.update(output=final)
+                    trace.update(output=full_output if full_output else final)
+
+            except Exception as e:
+                logger.error(f"Fallback stream failed: {e}")
+                trace.update(status_message="failed", metadata={"error": str(e)})
+                yield "[ERROR: AI service unavailable]"
+
+            langfuse.flush()   
