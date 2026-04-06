@@ -29,3 +29,5 @@ bcrypt>=4.0.0
 langfuse
 asyncpg
 slowapi
+snowflake-connector-python
+kafka-python
