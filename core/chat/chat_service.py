@@ -373,6 +373,7 @@
 
 import time
 import uuid
+import asyncio
 from datetime import datetime
 from typing import Any, Dict, List, AsyncGenerator
 
@@ -503,7 +504,7 @@ class ChatService:
             if answer and answer != "Not found in context" and "[" in answer:
                 await self.memory.save(req.session_id, req.query, answer)
 
-            # 8. SEND KAFKA EVENT
+            # 8. SEND KAFKA EVENT (Fire and Forget)
             try:
                 event = {
                     "event_id": str(uuid.uuid4()),
@@ -515,12 +516,15 @@ class ChatService:
                     "created_at": datetime.utcnow().isoformat()
                 }
 
-                await self.event_producer.send_and_wait("chat_events", event)
+                # Use create_task to send in background without blocking the response
+                asyncio.create_task(
+                    self.event_producer.send("chat_events", event)
+                )
 
-                logger.info(f"kafka_event_sent event_id={event['event_id']} latency={latency}s")
+                logger.info(f"kafka_event_queued event_id={event['event_id']} latency={latency}s")
 
             except Exception as kafka_error:
-                logger.error(f"kafka_send_failed error={kafka_error}")
+                logger.error(f"kafka_queue_failed error={kafka_error}")
 
             return {
                 "query": req.query,
@@ -599,7 +603,7 @@ class ChatService:
             if full_answer and "Not found in context" not in full_answer and "[" in full_answer:
                 await self.memory.save(req.session_id, req.query, full_answer)
 
-            # 8. SEND KAFKA EVENT
+            # 8. SEND KAFKA EVENT (Fire and Forget)
             try:
                 event = {
                     "event_id": str(uuid.uuid4()),
@@ -611,12 +615,15 @@ class ChatService:
                     "created_at": datetime.utcnow().isoformat()
                 }
 
-                await self.event_producer.send_and_wait("chat_events", event)
+                # Use create_task to send in background without blocking the stream end
+                asyncio.create_task(
+                    self.event_producer.send("chat_events", event)
+                )
 
-                logger.info(f"kafka_event_sent event_id={event['event_id']} latency={latency}s")
+                logger.info(f"kafka_event_queued event_id={event['event_id']} latency={latency}s")
 
             except Exception as kafka_error:
-                logger.error(f"kafka_send_failed error={kafka_error}")
+                logger.error(f"kafka_queue_failed error={kafka_error}")
 
         except Exception as e:
             logger.error(f"stream_chat_failed: {e}")

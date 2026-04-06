@@ -31,3 +31,6 @@ asyncpg
 slowapi
 snowflake-connector-python
 kafka-python
+aiokafka 
+fastavro 
+confluent-kafka

@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
 
-
 class ChatEvent(BaseModel):
     event_id: str
     session_id: str

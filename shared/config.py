@@ -55,4 +55,15 @@ class Settings:
     LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY")
     LANGFUSE_BASE_URL = os.getenv("LANGFUSE_BASE_URL")
     
+      # --- KAFKA ---
+    KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "localhost:9092")
+
+    # --- SNOWFLAKE ---
+    SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
+    SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
+    SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
+    SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
+    SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE")
+    SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
+    
 settings = Settings()
