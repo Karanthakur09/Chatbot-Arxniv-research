@@ -6,11 +6,17 @@ pwd_context = CryptContext(
     bcrypt__rounds=4  # Reduced from default 12 for faster hashing
 )
 
+# Bcrypt has a 72-byte limit for passwords
+MAX_PASSWORD_LENGTH = 56
+
 
 def hash_password(password: str) -> str:
-    # Bcrypt automatically truncates to 72 bytes
-    return pwd_context.hash(password)
+    # Truncate to 72 bytes as bcrypt requires
+    truncated = password[:MAX_PASSWORD_LENGTH]
+    return pwd_context.hash(truncated)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    # Truncate to 72 bytes to match what was hashed
+    truncated = plain[:MAX_PASSWORD_LENGTH]
+    return pwd_context.verify(truncated, hashed)

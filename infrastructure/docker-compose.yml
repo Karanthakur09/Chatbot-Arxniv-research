@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-
+  # --- Infrastructure ---
   redis:
     image: redis:7
     container_name: enterprise-redis
@@ -19,45 +19,51 @@ services:
       - ./qdrant_storage:/qdrant/storage
 
   kafka:
-    image: bitnami/kafka:latest
+    image: apache/kafka:latest
     container_name: enterprise-kafka
     restart: always
     ports:
       - "9092:9092"
-
     environment:
-      # Enable KRaft mode (NO ZooKeeper)
-      - KAFKA_ENABLE_KRAFT=yes
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_NODE_ID=1
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
 
-      # Node roles
-      - KAFKA_CFG_PROCESS_ROLES=broker,controller
-      - KAFKA_CFG_NODE_ID=1
+  # --- Your Python API ---
+  api:
+    build:
+      context: ..              # Look at the root folder for code
+      dockerfile: infrastructure/Dockerfile
+    container_name: enterprise-api
+    volumes:
+      - ..:/app
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - kafka
+      - redis
+      - qdrant
+    # The CMD in Dockerfile runs uvicorn by default
+    command: uvicorn services.api_gateway.main:app --host 0.0.0.0 --port 8000 --reload
 
-      # Controller quorum
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
-
-      # Listeners
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-
-      # Controller listener
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-
-      # Allow plaintext (dev only)
-      - ALLOW_PLAINTEXT_LISTENER=yes
-
-  schema-registry:
-    image: confluentinc/cp-schema-registry:7.5.0
-    container_name: enterprise-schema-registry
+  # --- Your Snowflake Worker ---
+  worker:
+    build:
+      context: ..              # Look at the root folder for code
+      dockerfile: infrastructure/Dockerfile
+    container_name: enterprise-worker
+    volumes:
+      - ..:/app
     restart: always
     depends_on:
       - kafka
-    ports:
-      - "8081:8081"
-    environment:
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
-      # Ensures it works on a single-node local Kafka
-      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1
+    # This overrides the default CMD to run your worker instead
+    command: python -m services.workers.snowflake_consumer

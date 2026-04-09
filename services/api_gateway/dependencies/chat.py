@@ -1,6 +1,6 @@
 # services/api_gateway/dependencies/chat.py
 from core.chat.chat_service import ChatService
-from services.api_gateway.main import kafka_producer
+from services.api_gateway.producer import kafka_producer
 
 # Import all the other tools your ChatService needs
 from infra.ai.embeddings.local_embedder import LocalEmbedder
