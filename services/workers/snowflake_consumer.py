@@ -52,13 +52,33 @@ class SnowflakeConsumer:
                         raise
 
     async def _init_snowflake(self):
-        """Initialize Snowflake service in async context"""
-        if self.snowflake is None:
-            self.snowflake = SnowflakeAsyncService()
+        """Initialize Snowflake service with retry logic"""
+        if self.snowflake is not None:
+            return
+        
+        max_retries = 5
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                logger.info(f"Initializing Snowflake service (attempt {retry_count + 1}/{max_retries})")
+                self.snowflake = SnowflakeAsyncService()
+                logger.info("Snowflake service initialized successfully")
+                return
+            except Exception as e:
+                retry_count += 1
+                logger.warning(f"Failed to initialize Snowflake (attempt {retry_count}/{max_retries}): {type(e).__name__}: {e}")
+                if retry_count < max_retries:
+                    backoff = 2 ** retry_count
+                    logger.info(f"Retrying Snowflake initialization in {backoff} seconds...")
+                    await asyncio.sleep(backoff)
+                else:
+                    logger.error("Failed to initialize Snowflake after max retries")
+                    raise
 
     async def start(self):
+        # Initialize consumer first
         await self._init_consumer()
-        await self._init_snowflake()
         
         # Retry starting consumer with exponential backoff
         max_retries = 10
@@ -78,23 +98,20 @@ class SnowflakeConsumer:
                     logger.error("Failed to start consumer after max retries")
                     raise
         
-        # Start DLQ producer
-        max_retries = 5
-        retry_count = 0
+        # Start DLQ producer (non-blocking)
+        try:
+            await self.dlq_producer.start(blocking=False)
+            logger.info("DLQ producer started")
+        except Exception as e:
+            logger.error(f"Failed to start DLQ producer: {e}")
         
-        while retry_count < max_retries:
-            try:
-                await self.dlq_producer.start()
-                logger.info("DLQ producer started successfully")
-                break
-            except Exception as e:
-                retry_count += 1
-                logger.warning(f"Failed to start DLQ producer (attempt {retry_count}/{max_retries}): {e}")
-                if retry_count < max_retries:
-                    await asyncio.sleep(2 ** retry_count)
-                else:
-                    logger.error("Failed to start DLQ producer after max retries")
-                    raise
+        # Initialize Snowflake (with retries but doesn't crash if it fails)
+        try:
+            await self._init_snowflake()
+            logger.info("Snowflake service ready")
+        except Exception as e:
+            logger.error(f"Failed to initialize Snowflake after max retries: {e}")
+            logger.warning("Worker will continue, but events cannot be flushed to Snowflake")
 
         try:
             async for msg in self.consumer:

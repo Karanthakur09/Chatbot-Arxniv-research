@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: chatbot-ai
+data:
+  # This points directly to the first pod of the Kafka StatefulSet
+  KAFKA_BOOTSTRAP: "kafka-0.kafka.chatbot-ai.svc.cluster.local:9092"
+  REDIS_HOST: "redis"
+  QDRANT_HOST: "qdrant"

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qdrant
+  namespace: chatbot-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qdrant
+  template:
+    metadata:
+      labels:
+        app: qdrant
+    spec:
+      containers:
+        - name: qdrant
+          image: qdrant/qdrant
+          ports:
+            - containerPort: 6333
+          # This tells the container WHERE to find the disk
+          volumeMounts:
+            - mountPath: /qdrant/storage
+              name: qdrant-storage
+      # This defines WHAT disk to use
+      volumes:
+        - name: qdrant-storage
+          persistentVolumeClaim:
+            claimName: qdrant-pvc
