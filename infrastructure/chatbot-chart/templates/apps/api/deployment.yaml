@@ -13,6 +13,17 @@ spec:
       labels:
         app: api
     spec:
+      dnsPolicy: "ClusterFirst"
+      dnsConfig:
+        nameservers:
+          - 8.8.8.8
+        searches:
+          - chatbot-ai.svc.cluster.local
+          - svc.cluster.local
+          - cluster.local
+        options:
+          - name: ndots
+            value: "5"
       containers:
         - name: api
           image: your-dockerhub/enterprise-ai:latest
