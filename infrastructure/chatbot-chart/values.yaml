@@ -159,3 +159,92 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+
+
+api:
+  replicaCount: 2
+  image:
+    repository: your-dockerhub/enterprise-ai
+    tag: latest
+    pullPolicy: Never
+  service:
+    type: ClusterIP
+  ingress:
+    host: your-domain.com
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPU: 80
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+dns:
+  policy: "ClusterFirst"
+  nameservers:
+    - 8.8.8.8
+  searches:
+    - chatbot-ai.svc.cluster.local
+    - svc.cluster.local
+    - cluster.local
+
+secrets:
+  snowflake: snowflake-secret
+configMaps:
+  appConfig: app-config
+
+
+worker:
+  replicaCount: 2
+  image:
+    repository: your-dockerhub/enterprise-ai
+    tag: latest
+    pullPolicy: Never
+  command: ["python", "-m", "services.workers.snowflake_consumer"]
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+
+storage:
+  qdrant:
+    size: 5Gi
+    accessModes:
+      - ReadWriteOnce
+  kafka:
+    size: 8Gi
+    accessModes:
+      - ReadWriteOnce
+
+kafka:
+  replicaCount: 1
+  replicationFactor: "1"  # Crucial for single-node dev cluster
+  image:
+    repository: apache/kafka
+    tag: latest
+  persistence:
+    size: 8Gi
+    accessModes:
+      - ReadWriteOnce
+
+qdrant:
+  replicaCount: 1
+  image:
+    repository: qdrant/qdrant
+    tag: latest
+
+redis:
+  replicaCount: 1
+  image:
+    repository: redis
+    tag: "7"

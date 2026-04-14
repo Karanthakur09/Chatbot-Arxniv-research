@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+{% comment %} apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: worker
@@ -46,4 +46,48 @@ spec:
             - secretRef:
                 name: snowflake-secret
             - configMapRef:
-                name: app-config
+                name: app-config {% endcomment %}
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chatbot-ai.fullname" . }}-worker
+  labels:
+    app: worker
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      dnsPolicy: {{ .Values.dns.policy | quote }}
+      dnsConfig:
+        nameservers:
+          {{- toYaml .Values.dns.nameservers | nindent 10 }}
+        searches:
+          {{- toYaml .Values.dns.searches | nindent 10 }}
+        options:
+          - name: ndots
+            value: "5"
+      containers:
+        - name: worker
+          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          command: {{ .Values.worker.command | toJson }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          livenessProbe:
+            exec:
+              command: ["pgrep", "-f", "snowflake_consumer"]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secrets.snowflake }}
+            - configMapRef:
+                name: {{ .Values.configMaps.appConfig }}

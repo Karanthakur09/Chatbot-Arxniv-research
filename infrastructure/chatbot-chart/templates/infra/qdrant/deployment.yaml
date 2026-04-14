@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+{% comment %} apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: qdrant
@@ -26,4 +26,34 @@ spec:
       volumes:
         - name: qdrant-storage
           persistentVolumeClaim:
+            claimName: qdrant-pvc {% endcomment %}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chatbot-ai.fullname" . }}-qdrant
+  labels:
+    app: qdrant
+spec:
+  replicas: {{ .Values.qdrant.replicaCount }}
+  selector:
+    matchLabels:
+      app: qdrant
+  template:
+    metadata:
+      labels:
+        app: qdrant
+    spec:
+      containers:
+        - name: qdrant
+          image: "{{ .Values.qdrant.image.repository }}:{{ .Values.qdrant.image.tag }}"
+          ports:
+            - containerPort: 6333
+          volumeMounts:
+            - mountPath: /qdrant/storage
+              name: qdrant-storage
+      volumes:
+        - name: qdrant-storage
+          persistentVolumeClaim:
+            # Matches the name in your common/storage.yaml
             claimName: qdrant-pvc

@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+{% comment %} apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
@@ -16,5 +16,27 @@ spec:
       containers:
         - name: redis
           image: redis:7
+          ports:
+            - containerPort: 6379 {% endcomment %}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chatbot-ai.fullname" . }}-redis
+  labels:
+    app: redis
+spec:
+  replicas: {{ .Values.redis.replicaCount }}
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
           ports:
             - containerPort: 6379

@@ -1,4 +1,4 @@
-apiVersion: networking.k8s.io/v1
+{% comment %} apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: api-ingress
@@ -14,4 +14,22 @@ spec:
               service:
                 name: api
                 port:
+                  number: 80 {% endcomment %}
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "chatbot-ai.fullname" . }}-api-ingress
+spec:
+  rules:
+    - host: {{ .Values.api.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "chatbot-ai.fullname" . }}-api
+                port:
                   number: 80
+                  
