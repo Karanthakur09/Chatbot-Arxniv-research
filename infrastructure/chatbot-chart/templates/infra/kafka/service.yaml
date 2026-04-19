@@ -1,15 +1,3 @@
-{% comment %} apiVersion: v1
-kind: Service
-metadata:
-  name: kafka
-  namespace: chatbot-ai
-spec:
-  clusterIP: None
-  selector:
-    app: kafka
-  ports:
-    - port: 9092 {% endcomment %}
-
 apiVersion: v1
 kind: Service
 metadata:

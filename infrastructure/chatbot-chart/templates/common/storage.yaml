@@ -1,28 +1,3 @@
-{% comment %} apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: qdrant-pvc
-  namespace: chatbot-ai
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: kafka-pvc
-  namespace: chatbot-ai  
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 8Gi {% endcomment %}
-
-
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

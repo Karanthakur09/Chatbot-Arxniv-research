@@ -1,16 +1,3 @@
-{% comment %} apiVersion: v1
-kind: Service
-metadata:
-  name: api
-  namespace: chatbot-ai
-spec:
-  selector:
-    app: api
-  ports:
-    - port: 80
-      targetPort: 8000
-  type: ClusterIP {% endcomment %}
-
 apiVersion: v1
 kind: Service
 metadata:

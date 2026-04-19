@@ -1,54 +1,3 @@
-{% comment %} apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: worker
-  namespace: chatbot-ai
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: worker
-  template:
-    metadata:
-      labels:
-        app: worker
-    spec:
-      dnsPolicy: "ClusterFirst"
-      dnsConfig:
-        nameservers:
-          - 8.8.8.8
-        searches:
-          - chatbot-ai.svc.cluster.local
-          - svc.cluster.local
-          - cluster.local
-        options:
-          - name: ndots
-            value: "5"
-      containers:
-        - name: worker
-          image: your-dockerhub/enterprise-ai:latest
-          imagePullPolicy: Never
-          command: ["python", "-m", "services.workers.snowflake_consumer"]
-          resources:
-            requests:
-              cpu: "200m"
-              memory: "256Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-          livenessProbe:
-            exec:
-              command: ["pgrep", "-f", "snowflake_consumer"]
-            initialDelaySeconds: 10
-            periodSeconds: 15
-          # --- ADDED SECRETS HERE ---
-          envFrom:
-            - secretRef:
-                name: snowflake-secret
-            - configMapRef:
-                name: app-config {% endcomment %}
-
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -83,9 +32,10 @@ spec:
             {{- toYaml .Values.worker.resources | nindent 12 }}
           livenessProbe:
             exec:
-              command: ["pgrep", "-f", "snowflake_consumer"]
-            initialDelaySeconds: 10
-            periodSeconds: 15
+              command: ["/bin/sh", "-c", "ps aux | grep 'snowflake_consumer' | grep -v grep"]
+            initialDelaySeconds: {{ .Values.worker.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.worker.probes.liveness.periodSeconds }}
+            failureThreshold: 3
           envFrom:
             - secretRef:
                 name: {{ .Values.secrets.snowflake }}
