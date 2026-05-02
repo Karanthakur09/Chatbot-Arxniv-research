@@ -14,6 +14,9 @@ spec:
       labels:
         app: worker
     spec:
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+
       dnsPolicy: {{ .Values.dns.policy | quote }}
       dnsConfig:
         nameservers:
@@ -23,21 +26,27 @@ spec:
         options:
           - name: ndots
             value: "5"
+
       containers:
         - name: worker
           image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
           imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
           command: {{ .Values.worker.command | toJson }}
+
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
+
           livenessProbe:
             exec:
               command: ["/bin/sh", "-c", "ps aux | grep 'snowflake_consumer' | grep -v grep"]
             initialDelaySeconds: {{ .Values.worker.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ .Values.worker.probes.liveness.periodSeconds }}
             failureThreshold: 3
+
           envFrom:
+            - secretRef:
+                name: app-secrets
             - secretRef:
                 name: {{ .Values.secrets.snowflake }}
             - configMapRef:
-                name: {{ .Values.configMaps.appConfig }}
+                name: {{ .Values.configMaps.appConfig }}                

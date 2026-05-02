@@ -1,182 +1,317 @@
-# Default values for chatbot-chart.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
+# # Default values for chatbot-chart.
+# # This is a YAML-formatted file.
+# # Declare variables to be passed into your templates.
 
-# This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
+# # This will set the replicaset count more information can be found here: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/
+# replicaCount: 1
+
+# # This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
+# image:
+#   repository: nginx
+#   # This sets the pull policy for images.
+#   pullPolicy: IfNotPresent
+#   # Overrides the image tag whose default is the chart appVersion.
+#   tag: ""
+
+# # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+# imagePullSecrets: []
+# # This is to override the chart name.
+# nameOverride: ""
+# fullnameOverride: ""
+
+# # This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
+# serviceAccount:
+#   # Specifies whether a service account should be created.
+#   create: true
+#   # Automatically mount a ServiceAccount's API credentials?
+#   automount: true
+#   # Annotations to add to the service account.
+#   annotations: {}
+#   # The name of the service account to use.
+#   # If not set and create is true, a name is generated using the fullname template.
+#   name: ""
+
+# # This is for setting Kubernetes Annotations to a Pod.
+# # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+# podAnnotations: {}
+# # This is for setting Kubernetes Labels to a Pod.
+# # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+# podLabels: {}
+
+# podSecurityContext: {}
+#   # fsGroup: 2000
+
+# securityContext: {}
+#   # capabilities:
+#   #   drop:
+#   #   - ALL
+#   # readOnlyRootFilesystem: true
+#   # runAsNonRoot: true
+#   # runAsUser: 1000
+
+# # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
+# service:
+#   # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+#   type: ClusterIP
+#   # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
+#   port: 80
+
+# # This block is for setting up the ingress for more information can be found here: https://kubernetes.io/docs/concepts/services-networking/ingress/
+# ingress:
+#   enabled: false
+#   className: ""
+#   annotations: {}
+#     # kubernetes.io/ingress.class: nginx
+#     # kubernetes.io/tls-acme: "true"
+#   hosts:
+#     - host: chart-example.local
+#       paths:
+#         - path: /
+#           pathType: ImplementationSpecific
+#   tls: []
+#     # - secretName: chart-example-tls
+#     #   hosts:
+#     #     - chart-example.local
+
+# # -- Expose the service via gateway-api HTTPRoute
+# # Requires Gateway API resources and suitable controller installed within the cluster
+# # (see: https://gateway-api.sigs.k8s.io/guides/)
+# httpRoute:
+#   # HTTPRoute enabled.
+#   enabled: false
+#   # HTTPRoute annotations.
+#   annotations: {}
+#   # Which Gateways this Route is attached to.
+#   parentRefs:
+#   - name: gateway
+#     sectionName: http
+#     # namespace: default
+#   # Hostnames matching HTTP header.
+#   hostnames:
+#   - chart-example.local
+#   # List of rules and filters applied.
+#   rules:
+#   - matches:
+#     - path:
+#         type: PathPrefix
+#         value: /headers
+#   #   filters:
+#   #   - type: RequestHeaderModifier
+#   #     requestHeaderModifier:
+#   #       set:
+#   #       - name: My-Overwrite-Header
+#   #         value: this-is-the-only-value
+#   #       remove:
+#   #       - User-Agent
+#   # - matches:
+#   #   - path:
+#   #       type: PathPrefix
+#   #       value: /echo
+#   #     headers:
+#   #     - name: version
+#   #       value: v2
+
+# resources: {}
+#   # We usually recommend not to specify default resources and to leave this as a conscious
+#   # choice for the user. This also increases chances charts run on environments with little
+#   # resources, such as Minikube. If you do want to specify resources, uncomment the following
+#   # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+#   # limits:
+#   #   cpu: 100m
+#   #   memory: 128Mi
+#   # requests:
+#   #   cpu: 100m
+#   #   memory: 128Mi
+
+# # This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+# livenessProbe:
+#   httpGet:
+#     path: /
+#     port: http
+# readinessProbe:
+#   httpGet:
+#     path: /
+#     port: http
+
+# # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
+# autoscaling:
+#   enabled: false
+#   minReplicas: 1
+#   maxReplicas: 100
+#   targetCPUUtilizationPercentage: 80
+#   # targetMemoryUtilizationPercentage: 80
+
+# # Additional volumes on the output Deployment definition.
+# volumes: []
+#   # - name: foo
+#   #   secret:
+#   #     secretName: mysecret
+#   #     optional: false
+
+# # Additional volumeMounts on the output Deployment definition.
+# volumeMounts: []
+#   # - name: foo
+#   #   mountPath: "/etc/foo"
+#   #   readOnly: true
+
+# nodeSelector: {}
+
+# tolerations: []
+
+# affinity: {}
+
+
+
+# api:
+#   replicaCount: 2
+#   image:
+#     repository: registry.digitalocean.com/enterprise-ai-registry/enterprise-ai
+#     tag: latest
+#     pullPolicy: Always
+#   service:
+#     type: ClusterIP
+#   ingress:
+#     host: your-domain.com
+#   hpa:
+#     enabled: true
+#     minReplicas: 2
+#     maxReplicas: 5
+#     targetCPU: 80
+#   resources:
+#     requests:
+#       cpu: "200m"
+#       memory: "512Mi"
+#     limits:
+#       cpu: "500m"
+#       memory: "1Gi"
+#   probes:
+#     liveness:
+#       initialDelaySeconds: 30
+#       periodSeconds: 15
+#     readiness:
+#       initialDelaySeconds: 20
+#       periodSeconds: 10  
+
+# dns:
+#   policy: "ClusterFirst"
+#   nameservers:
+#     - 8.8.8.8
+#   searches:
+#     - chatbot-ai.svc.cluster.local
+#     - svc.cluster.local
+#     - cluster.local
+
+# secrets:
+#   snowflake: snowflake-secret
+# configMaps:
+#   appConfig: app-config
+
+
+# worker:
+#   replicaCount: 2
+#   image:
+#     repository: registry.digitalocean.com/enterprise-ai-registry/enterprise-ai
+#     tag: latest
+#     pullPolicy: Always
+#   command: ["python", "-m", "services.workers.snowflake_consumer"]
+#   resources:
+#     requests:
+#       cpu: "500m"
+#       memory: "512Mi"
+#     limits:
+#       cpu: "1000m"
+#       memory: "2Gi"
+#   probes:
+#     liveness:
+#       initialDelaySeconds: 60
+#       periodSeconds: 30
+
+
+# storage:
+#   qdrant:
+#     size: 5Gi
+#     accessModes:
+#       - ReadWriteOnce
+#   kafka:
+#     size: 8Gi
+#     accessModes:
+#       - ReadWriteOnce
+
+# kafka:
+#   replicaCount: 1
+#   replicationFactor: "1"  # Crucial for single-node dev cluster
+#   image:
+#     repository: apache/kafka
+#     tag: latest
+#   persistence:
+#     size: 8Gi
+#     accessModes:
+#       - ReadWriteOnce
+
+# qdrant:
+#   replicaCount: 1
+#   image:
+#     repository: qdrant/qdrant
+#     tag: latest
+
+# redis:
+#   replicaCount: 1
+#   image:
+#     repository: redis
+#     tag: "7"
+
 replicaCount: 1
 
-# This sets the container image more information can be found here: https://kubernetes.io/docs/concepts/containers/images/
 image:
-  repository: nginx
-  # This sets the pull policy for images.
-  pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  repository: registry.digitalocean.com/enterprise-ai-registry/enterprise-ai
+  tag: latest
+  pullPolicy: Always
 
-# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-imagePullSecrets: []
-# This is to override the chart name.
-nameOverride: ""
-fullnameOverride: ""
+imagePullSecrets:
+  - name: registry-enterprise-ai-registry   # ✅ FIXED
 
-# This section builds out the service account more information can be found here: https://kubernetes.io/docs/concepts/security/service-accounts/
-serviceAccount:
-  # Specifies whether a service account should be created.
-  create: true
-  # Automatically mount a ServiceAccount's API credentials?
-  automount: true
-  # Annotations to add to the service account.
-  annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template.
-  name: ""
+# ---------------- DNS ----------------
+dns:
+  policy: ClusterFirst
+  nameservers:
+    - 8.8.8.8
+    - 8.8.4.4
+  searches:
+    - default.svc.cluster.local
+    - svc.cluster.local
 
-# This is for setting Kubernetes Annotations to a Pod.
-# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
-podAnnotations: {}
-# This is for setting Kubernetes Labels to a Pod.
-# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
-podLabels: {}
-
-podSecurityContext: {}
-  # fsGroup: 2000
-
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
-
-# This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
+# ---------------- SERVICE ----------------
 service:
-  # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
   type: ClusterIP
-  # This sets the ports more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
-  port: 80
+  port: 8000
 
-# This block is for setting up the ingress for more information can be found here: https://kubernetes.io/docs/concepts/services-networking/ingress/
-ingress:
-  enabled: false
-  className: ""
-  annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
-  hosts:
-    - host: chart-example.local
-      paths:
-        - path: /
-          pathType: ImplementationSpecific
-  tls: []
-    # - secretName: chart-example-tls
-    #   hosts:
-    #     - chart-example.local
-
-# -- Expose the service via gateway-api HTTPRoute
-# Requires Gateway API resources and suitable controller installed within the cluster
-# (see: https://gateway-api.sigs.k8s.io/guides/)
-httpRoute:
-  # HTTPRoute enabled.
-  enabled: false
-  # HTTPRoute annotations.
-  annotations: {}
-  # Which Gateways this Route is attached to.
-  parentRefs:
-  - name: gateway
-    sectionName: http
-    # namespace: default
-  # Hostnames matching HTTP header.
-  hostnames:
-  - chart-example.local
-  # List of rules and filters applied.
-  rules:
-  - matches:
-    - path:
-        type: PathPrefix
-        value: /headers
-  #   filters:
-  #   - type: RequestHeaderModifier
-  #     requestHeaderModifier:
-  #       set:
-  #       - name: My-Overwrite-Header
-  #         value: this-is-the-only-value
-  #       remove:
-  #       - User-Agent
-  # - matches:
-  #   - path:
-  #       type: PathPrefix
-  #       value: /echo
-  #     headers:
-  #     - name: version
-  #       value: v2
-
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
-
-# This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
-livenessProbe:
-  httpGet:
-    path: /
-    port: http
-readinessProbe:
-  httpGet:
-    path: /
-    port: http
-
-# This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 100
-  targetCPUUtilizationPercentage: 80
-  # targetMemoryUtilizationPercentage: 80
-
-# Additional volumes on the output Deployment definition.
-volumes: []
-  # - name: foo
-  #   secret:
-  #     secretName: mysecret
-  #     optional: false
-
-# Additional volumeMounts on the output Deployment definition.
-volumeMounts: []
-  # - name: foo
-  #   mountPath: "/etc/foo"
-  #   readOnly: true
-
-nodeSelector: {}
-
-tolerations: []
-
-affinity: {}
-
-
-
+# ---------------- API ----------------
 api:
   replicaCount: 2
+
   image:
-    repository: your-dockerhub/enterprise-ai
+    repository: registry.digitalocean.com/enterprise-ai-registry/enterprise-ai
     tag: latest
-    pullPolicy: Never
+    pullPolicy: Always
+
   service:
     type: ClusterIP
+    port: 8000
+
   ingress:
-    host: your-domain.com
+    host: ""
+
   hpa:
-    enabled: true
-    minReplicas: 2
-    maxReplicas: 5
-    targetCPU: 80
+    enabled: false
+
+  probes:
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readiness:
+      initialDelaySeconds: 20
+      periodSeconds: 10
+
   resources:
     requests:
       cpu: "200m"
@@ -184,67 +319,54 @@ api:
     limits:
       cpu: "500m"
       memory: "1Gi"
+
+# ---------------- WORKER ----------------
+worker:
+  replicaCount: 1
+
+  image:
+    repository: registry.digitalocean.com/enterprise-ai-registry/enterprise-ai
+    tag: latest
+    pullPolicy: Always
+
+  command: ["python", "-m", "services.workers.snowflake_consumer"]
+
   probes:
     liveness:
       initialDelaySeconds: 30
-      periodSeconds: 15
-    readiness:
-      initialDelaySeconds: 20
-      periodSeconds: 10  
+      periodSeconds: 10
 
-dns:
-  policy: "ClusterFirst"
-  nameservers:
-    - 8.8.8.8
-  searches:
-    - chatbot-ai.svc.cluster.local
-    - svc.cluster.local
-    - cluster.local
-
-secrets:
-  snowflake: snowflake-secret
-configMaps:
-  appConfig: app-config
-
-
-worker:
-  replicaCount: 2
-  image:
-    repository: your-dockerhub/enterprise-ai
-    tag: latest
-    pullPolicy: Never
-  command: ["python", "-m", "services.workers.snowflake_consumer"]
   resources:
     requests:
-      cpu: "500m"
+      cpu: "300m"
       memory: "512Mi"
     limits:
-      cpu: "1000m"
-      memory: "2Gi"
-  probes:
-    liveness:
-      initialDelaySeconds: 60
-      periodSeconds: 30
+      cpu: "700m"
+      memory: "1Gi"
 
-
+# ---------------- STORAGE ----------------
 storage:
   qdrant:
+    accessModes:
+      - ReadWriteOnce
     size: 5Gi
-    accessModes:
-      - ReadWriteOnce
-  kafka:
-    size: 8Gi
-    accessModes:
-      - ReadWriteOnce
 
+  kafka:
+    accessModes:
+      - ReadWriteOnce
+    size: 5Gi
+
+# ---------------- INFRA ----------------
 kafka:
   replicaCount: 1
-  replicationFactor: "1"  # Crucial for single-node dev cluster
+  replicationFactor: "1"
+
   image:
     repository: apache/kafka
     tag: latest
+
   persistence:
-    size: 8Gi
+    size: 5Gi
     accessModes:
       - ReadWriteOnce
 
@@ -259,3 +381,48 @@ redis:
   image:
     repository: redis
     tag: "7"
+
+# ---------------- AUTOSCALING ----------------
+autoscaling:
+  enabled: false
+
+# ---------------- DATABASE ----------------
+database:
+  url: "postgresql://neondb_owner:npg_gpt9dKYhkOa7@ep-young-union-a12s5gxh-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+
+# ---------------- R2 CLOUDFLARE STORAGE ----------------
+r2:
+  endpoint: "https://0eb45a0289b6aac41b57333437a39873.r2.cloudflarestorage.com"
+  accessKey: "3712ac077b9428acf30546813ffa0b67"
+  secretKey: "8493bdaca6031820212064dd74a6e3ccaf5b3048056b53a3ecda633c5925ec8b"
+  bucket: "legal-ai"
+
+# ---------------- LANGFUSE ----------------
+langfuse:
+  baseUrl: "https://cloud.langfuse.com"
+  secretKey: "sk-lf-614a4e10-4824-471b-a81c-370938d63170"
+  publicKey: "pk-lf-be9bfa15-c361-442e-8c55-b6844a2296f2"
+
+# ---------------- GEMINI ----------------
+gemini:
+  apiKey: "AIzaSyB_aaydvJlGlIPHovEv3TIHApKyRydI-cI"
+
+# ---------------- OPENROUTER ----------------
+openrouter:
+  apiKey: ""
+
+# ---------------- SNOWFLAKE ----------------
+snowflake:
+  user: "KARAN4949"
+  password: "@Thakur11223344"
+  account: "SWAMJMQ-PG18723"
+  warehouse: "COMPUTE_WH"
+  database: "CHAT_APP"
+  schema: "PUBLIC"
+
+# ---------------- CONFIG ----------------
+secrets:
+  snowflake: snowflake-secret
+
+configMaps:
+  appConfig: app-config

@@ -14,6 +14,9 @@ spec:
       labels:
         app: api
     spec:
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+
       dnsPolicy: {{ .Values.dns.policy | quote }}
       dnsConfig:
         nameservers:
@@ -23,27 +26,34 @@ spec:
         options:
           - name: ndots
             value: "5"
+
       containers:
         - name: api
           image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           ports:
             - containerPort: 8000
+
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
+
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: {{ .Values.api.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ .Values.api.probes.liveness.periodSeconds }}
+
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: {{ .Values.api.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.api.probes.readiness.periodSeconds }}
+
           envFrom:
+            - secretRef:
+                name: app-secrets
             - secretRef:
                 name: {{ .Values.secrets.snowflake }}
             - configMapRef:

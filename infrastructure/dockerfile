@@ -1,14 +1,49 @@
+# FROM python:3.11 as builder
+
+# WORKDIR /app
+
+# RUN apt-get update && apt-get install -y --no-install-recommends gcc curl && rm -rf /var/lib/apt/lists/*
+
+# COPY requirements.txt /app/
+# RUN pip install --no-cache-dir --user -r requirements.txt
+
+# # Final stage
+# FROM python:3.11-slim
+
+# WORKDIR /app
+
+# COPY --from=builder /root/.local /root/.local
+# ENV PATH=/root/.local/bin:$PATH
+
+# COPY . /app/
+
+# CMD ["uvicorn", "services.api_gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+FROM python:3.11 as builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /app/
+
+# Correct CPU-only PyTorch source
+RUN pip install --no-cache-dir --user torch \
+    --index-url https://download.pytorch.org/whl/cpu
+
+# Install remaining dependencies
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# -------- Final Stage --------
 FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y gcc curl && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
 
-# Look for requirements in the parent folder (root)
-COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy everything from the root into /app
 COPY . /app/
 
 CMD ["uvicorn", "services.api_gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]

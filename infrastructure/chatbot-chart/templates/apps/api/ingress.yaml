@@ -2,9 +2,18 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "chatbot-ai.fullname" . }}-api-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
+  ingressClassName: nginx
+
+  tls:
+    - hosts:
+        - testing-chatbot.duckdns.org
+      secretName: tls-secret
+
   rules:
-    - host: {{ .Values.api.ingress.host | quote }}
+    - host: testing-chatbot.duckdns.org
       http:
         paths:
           - path: /
@@ -14,4 +23,3 @@ spec:
                 name: {{ include "chatbot-ai.fullname" . }}-api
                 port:
                   number: 80
-                  

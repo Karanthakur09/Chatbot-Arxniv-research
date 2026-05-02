@@ -6,4 +6,32 @@ data:
   # Dynamically constructed to match your release name and namespace
   KAFKA_BOOTSTRAP: "{{ include "chatbot-ai.fullname" . }}-kafka-0.{{ include "chatbot-ai.fullname" . }}-kafka.{{ .Release.Namespace }}.svc.cluster.local:9092"
   REDIS_HOST: "{{ include "chatbot-ai.fullname" . }}-redis"
+  REDIS_PORT: "6379"
   QDRANT_HOST: "{{ include "chatbot-ai.fullname" . }}-qdrant"
+  QDRANT_PORT: "6333"
+  
+  # Database
+  DATABASE_URL: "{{ .Values.database.url }}"
+  
+  # Data & Configuration
+  DATA_DIR: "data"
+  ARXIV_BASE_URL: "http://export.arxiv.org/api/query"
+  ARXIV_QUERY: "all:ai"
+  ARXIV_BATCH_SIZE: "100"
+  REQUEST_TIMEOUT: "30"
+  ARXIV_RATE_LIMIT_SECONDS: "3"
+  
+  # R2 Cloudflare Storage
+  R2_ENDPOINT: "{{ .Values.r2.endpoint }}"
+  R2_BUCKET: "{{ .Values.r2.bucket }}"
+  
+  # LLM Configuration
+  GEMINI_MODEL: "gemini-2.5-flash"
+  LLM_TEMPERATURE: "0.2"
+  LLM_MAX_TOKENS: "1024"
+  GEMINI_RATE_LIMIT_SECONDS: "1"
+  CONTEXT_MAX_TOKENS: "6000"
+  OPENROUTER_MODEL: "deepseek/deepseek-chat"
+  
+  # Langfuse
+  LANGFUSE_BASE_URL: "{{ .Values.langfuse.baseUrl }}"

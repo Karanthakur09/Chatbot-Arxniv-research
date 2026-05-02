@@ -1,8 +1,19 @@
-.venv
-venv
-env
-__pycache__
+# Ignore the virtual environment (huge!)
+venv/
+.venv/
+env/
+
+# Ignore git history
+.git/
+.gitignore
+
+# Ignore Python cache
+__pycache__/
 *.pyc
-.git
-qdrant_storage
-infrastructure/qdrant_storage
+
+# Ignore local environment variables
+.env
+
+# Ignore large data or PDF files used for local testing
+*.pdf
+data/
