@@ -388,37 +388,37 @@ autoscaling:
 
 # ---------------- DATABASE ----------------
 database:
-  url: "postgresql://neondb_owner:npg_gpt9dKYhkOa7@ep-young-union-a12s5gxh-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+  url: "${DATABASE_URL}"
 
 # ---------------- R2 CLOUDFLARE STORAGE ----------------
 r2:
-  endpoint: "https://0eb45a0289b6aac41b57333437a39873.r2.cloudflarestorage.com"
-  accessKey: "3712ac077b9428acf30546813ffa0b67"
-  secretKey: "8493bdaca6031820212064dd74a6e3ccaf5b3048056b53a3ecda633c5925ec8b"
+  endpoint: "${R2_ENDPOINT}"
+  accessKey: "${R2_ACCESS_KEY}"
+  secretKey: "${R2_SECRET_KEY}"
   bucket: "legal-ai"
 
 # ---------------- LANGFUSE ----------------
 langfuse:
   baseUrl: "https://cloud.langfuse.com"
-  secretKey: "sk-lf-614a4e10-4824-471b-a81c-370938d63170"
-  publicKey: "pk-lf-be9bfa15-c361-442e-8c55-b6844a2296f2"
+  secretKey: "${LANGFUSE_SECRET_KEY}"
+  publicKey: "${LANGFUSE_PUBLIC_KEY}"
 
 # ---------------- GEMINI ----------------
 gemini:
-  apiKey: "AIzaSyB_aaydvJlGlIPHovEv3TIHApKyRydI-cI"
+  apiKey: "${GEMINI_API_KEY}"
 
 # ---------------- OPENROUTER ----------------
 openrouter:
-  apiKey: ""
+  apiKey: "${OPENROUTER_API_KEY}"
 
 # ---------------- SNOWFLAKE ----------------
 snowflake:
-  user: "KARAN4949"
-  password: "@Thakur11223344"
-  account: "SWAMJMQ-PG18723"
-  warehouse: "COMPUTE_WH"
-  database: "CHAT_APP"
-  schema: "PUBLIC"
+  user: "${SNOWFLAKE_USER}"
+  password: "${SNOWFLAKE_PASSWORD}"
+  account: "${SNOWFLAKE_ACCOUNT}"
+  warehouse: "${SNOWFLAKE_WAREHOUSE}"
+  database: "${SNOWFLAKE_DATABASE}"
+  schema: "${SNOWFLAKE_SCHEMA}"
 
 # ---------------- CONFIG ----------------
 secrets:

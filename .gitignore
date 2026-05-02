@@ -11,6 +11,10 @@ ENV/
 .env
 .env.*
 
+# Helm secrets
+infrastructure/chatbot-chart/values-secrets.yaml
+infrastructure/chatbot-chart/values-*.yaml
+
 # Distribution / packaging
 build/
 dist/
