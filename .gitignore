@@ -11,6 +11,9 @@ ENV/
 .env
 .env.*
 
+# Configuration files with secrets
+replacements.txt
+
 # Helm secrets
 infrastructure/chatbot-chart/values-secrets.yaml
 infrastructure/chatbot-chart/values-*.yaml

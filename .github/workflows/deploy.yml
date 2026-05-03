@@ -1,0 +1,55 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  REGISTRY: registry.digitalocean.com/enterprise-ai-registry
+  IMAGE: enterprise-ai
+  NAMESPACE: chatbot-ai
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.DO_API_TOKEN }}
+
+    - name: Login registry
+      run: doctl registry login
+
+    - name: Build image
+      run: |
+        docker build -t $REGISTRY/$IMAGE:${{ github.sha }} -f infrastructure/Dockerfile .
+        docker tag $REGISTRY/$IMAGE:${{ github.sha }} $REGISTRY/$IMAGE:latest
+
+    - name: Push image
+      run: |
+        docker push $REGISTRY/$IMAGE:${{ github.sha }}
+        docker push $REGISTRY/$IMAGE:latest
+
+    - name: Setup kubeconfig
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+
+    - name: Deploy
+      run: |
+        helm upgrade chatbot-prod ./infrastructure/chatbot-chart \
+          --namespace $NAMESPACE \
+          -f ./infrastructure/chatbot-chart/values.yaml \
+          --set api.image.tag=${{ github.sha }} \
+          --set worker.image.tag=${{ github.sha }}
+
+    - name: Verify
+      run: kubectl get pods -n $NAMESPACE
