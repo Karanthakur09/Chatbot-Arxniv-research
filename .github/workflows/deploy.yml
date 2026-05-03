@@ -8,6 +8,7 @@ env:
   REGISTRY: registry.digitalocean.com/enterprise-ai-registry
   IMAGE: enterprise-ai
   NAMESPACE: chatbot-ai
+  RELEASE: chatbot-prod
 
 jobs:
   deploy:
@@ -22,7 +23,7 @@ jobs:
       with:
         token: ${{ secrets.DO_API_TOKEN }}
 
-    - name: Login registry
+    - name: Login to registry
       run: doctl registry login
 
     - name: Build image
@@ -39,17 +40,71 @@ jobs:
       run: |
         mkdir -p ~/.kube
         echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+        chmod 600 ~/.kube/config
 
     - name: Install Helm
       uses: azure/setup-helm@v4
 
-    - name: Deploy
+    - name: Update Snowflake Secret
       run: |
-        helm upgrade chatbot-prod ./infrastructure/chatbot-chart \
+        kubectl create secret generic snowflake-secret \
+          --from-literal=SNOWFLAKE_ACCOUNT=${{ secrets.SNOWFLAKE_ACCOUNT }} \
+          --from-literal=SNOWFLAKE_USER=${{ secrets.SNOWFLAKE_USER }} \
+          --from-literal=SNOWFLAKE_PASSWORD="${{ secrets.SNOWFLAKE_PASSWORD }}" \
+          --from-literal=SNOWFLAKE_WAREHOUSE=${{ secrets.SNOWFLAKE_WAREHOUSE }} \
+          --from-literal=SNOWFLAKE_DATABASE=${{ secrets.SNOWFLAKE_DATABASE }} \
+          --from-literal=SNOWFLAKE_SCHEMA=${{ secrets.SNOWFLAKE_SCHEMA }} \
+          -n $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+      env:
+        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+
+    - name: Deploy with Helm
+      run: |
+        helm upgrade $RELEASE ./infrastructure/chatbot-chart \
           --namespace $NAMESPACE \
           -f ./infrastructure/chatbot-chart/values.yaml \
           --set api.image.tag=${{ github.sha }} \
           --set worker.image.tag=${{ github.sha }}
 
-    - name: Verify
-      run: kubectl get pods -n $NAMESPACE
+    - name: Wait for rollout
+      run: |
+        echo "Waiting for deployments to be ready..."
+        kubectl rollout status deployment/chatbot-prod-chatbot-ai-api -n $NAMESPACE --timeout=5m || true
+        kubectl rollout status deployment/chatbot-prod-chatbot-ai-worker -n $NAMESPACE --timeout=5m || true
+        sleep 10
+
+    - name: Verify Deployment
+      run: |
+        echo "=== Pod Status ==="
+        kubectl get pods -n $NAMESPACE
+        echo ""
+        echo "=== Pod Details ==="
+        kubectl get pods -n $NAMESPACE -o wide
+
+    - name: Check Logs
+      if: always()
+      run: |
+        echo "=== API Pod Logs ==="
+        kubectl logs -n $NAMESPACE -l app=api --tail=30 || echo "No API logs yet"
+        echo ""
+        echo "=== Worker Pod Logs ==="
+        kubectl logs -n $NAMESPACE -l app=worker --tail=30 || echo "No Worker logs yet"
+
+    - name: Debug on failure
+      if: failure()
+      run: |
+        echo "❌ Deployment failed! Debug info:"
+        echo ""
+        echo "=== Pod Descriptions ==="
+        kubectl describe pods -n $NAMESPACE || true
+        echo ""
+        echo "=== Events ==="
+        kubectl get events -n $NAMESPACE --sort-by='.lastTimestamp' || true
+
+    - name: Success notification
+      if: success()
+      run: |
+        echo "✅ Deployment successful!"
+        echo "Release: $RELEASE"
+        echo "Namespace: $NAMESPACE"
+        kubectl get pods -n $NAMESPACE
